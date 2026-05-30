@@ -136,7 +136,7 @@ function createWindow() {
     },
 
     // 任务栏图标
-    icon: path.join(__dirname, 'icon.png'),
+    icon: path.join(__dirname, 'assets', 'icon.png'),
 
     // 毛玻璃效果
     backgroundColor: '#00000000',
