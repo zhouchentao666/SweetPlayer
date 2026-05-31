@@ -700,7 +700,18 @@ const PlayerBar = {
         currentSongPath: this.currentPlaylist.length > 0 && this.currentIndex >= 0
           ? this.currentPlaylist[this.currentIndex].path : null,
         currentTime: this.audio ? this.audio.currentTime : 0,
-        isPlaying: this.isPlaying
+        isPlaying: this.isPlaying,
+        playlist: this.currentPlaylist.map(song => ({
+          name: song.name || '',
+          path: song.path,
+          artist: song.artist || '',
+          album: song.album || '',
+          year: song.year || '',
+          genre: song.genre || '',
+          duration: song.duration || 0,
+          cover: song.cover || ''
+        })),
+        currentIndex: this.currentIndex
       };
       ipcRenderer.send('save-settings', { playerState: state });
     } catch (e) {
@@ -734,25 +745,32 @@ const PlayerBar = {
       }
 
       if (state.currentSongPath) {
-        const playlistsData = await ipcRenderer.invoke('load-playlists');
-        if (playlistsData && playlistsData.playlists) {
-          let foundSong = null;
-          let foundPlaylist = null;
-          let foundIndex = -1;
-          for (const playlist of playlistsData.playlists) {
-            if (playlist.songs) {
-              const idx = playlist.songs.findIndex(s => s.path === state.currentSongPath);
-              if (idx !== -1) {
-                foundSong = playlist.songs[idx];
-                foundPlaylist = playlist.songs;
-                foundIndex = idx;
-                break;
-              }
-            }
-          }
+        // 优先使用保存的播放列表数据
+        if (state.playlist && state.playlist.length > 0) {
+          this.currentPlaylist = state.playlist;
+          this.currentIndex = state.currentIndex >= 0 ? state.currentIndex : 0;
+          const foundSong = this.currentPlaylist[this.currentIndex];
+
           if (foundSong) {
-            this.currentPlaylist = foundPlaylist;
-            this.currentIndex = foundIndex;
+            // 获取当前播放歌曲的元数据（确保封面等最新）
+            try {
+              const meta = await ipcRenderer.invoke('parse-song-metadata', foundSong.path);
+              if (meta) {
+                if (meta.title) foundSong.name = meta.title;
+                if (meta.artist) foundSong.artist = meta.artist;
+                if (meta.album) foundSong.album = meta.album;
+                if (meta.year) foundSong.year = meta.year;
+                if (meta.genre) foundSong.genre = meta.genre;
+                if (meta.duration) foundSong.duration = meta.duration;
+                if (meta.cover) foundSong.cover = meta.cover;
+              }
+            } catch (e) {
+              console.error('恢复时获取元数据失败:', e);
+            }
+
+            // 异步获取播放列表中其他歌曲的元数据
+            this.fetchPlaylistMetadata(this.currentPlaylist);
+
             this.audio = new Audio(foundSong.path);
             this.audio.volume = this.volume / 100;
             this.audio.playbackRate = this.playbackRate;
@@ -782,6 +800,77 @@ const PlayerBar = {
             } else {
               this.isPlaying = false;
               this.updatePlayButton();
+            }
+          }
+        } else {
+          // 兼容旧版本：从歌单中恢复
+          const playlistsData = await ipcRenderer.invoke('load-playlists');
+          if (playlistsData && playlistsData.playlists) {
+            let foundSong = null;
+            let foundPlaylist = null;
+            let foundIndex = -1;
+            for (const playlist of playlistsData.playlists) {
+              if (playlist.songs) {
+                const idx = playlist.songs.findIndex(s => s.path === state.currentSongPath);
+                if (idx !== -1) {
+                  foundSong = playlist.songs[idx];
+                  foundPlaylist = playlist.songs;
+                  foundIndex = idx;
+                  break;
+                }
+              }
+            }
+            if (foundSong) {
+              this.currentPlaylist = foundPlaylist;
+              this.currentIndex = foundIndex;
+
+              try {
+                const meta = await ipcRenderer.invoke('parse-song-metadata', foundSong.path);
+                if (meta) {
+                  if (meta.title) foundSong.name = meta.title;
+                  if (meta.artist) foundSong.artist = meta.artist;
+                  if (meta.album) foundSong.album = meta.album;
+                  if (meta.year) foundSong.year = meta.year;
+                  if (meta.genre) foundSong.genre = meta.genre;
+                  if (meta.duration) foundSong.duration = meta.duration;
+                  if (meta.cover) foundSong.cover = meta.cover;
+                }
+              } catch (e) {
+                console.error('恢复时获取元数据失败:', e);
+              }
+
+              this.fetchPlaylistMetadata(foundPlaylist);
+
+              this.audio = new Audio(foundSong.path);
+              this.audio.volume = this.volume / 100;
+              this.audio.playbackRate = this.playbackRate;
+              this.audio.addEventListener('loadedmetadata', () => {
+                this.duration = this.audio.duration;
+                this.updateDurationDisplay();
+                if (state.currentTime > 0 && state.currentTime < this.duration) {
+                  this.audio.currentTime = state.currentTime;
+                }
+              });
+              this.audio.addEventListener('ended', () => {
+                this.onSongEnded();
+              });
+              this.audio.addEventListener('error', () => {
+                this.isPlaying = false;
+                this.updatePlayButton();
+              });
+              this.updateSongInfo(foundSong);
+              if (state.isPlaying) {
+                this.audio.play().catch(() => {
+                  this.isPlaying = false;
+                  this.updatePlayButton();
+                });
+                this.isPlaying = true;
+                this.updatePlayButton();
+                this.startProgressTimer();
+              } else {
+                this.isPlaying = false;
+                this.updatePlayButton();
+              }
             }
           }
         }
@@ -897,6 +986,37 @@ const PlayerBar = {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  },
+
+  // 获取播放列表中所有歌曲的元数据
+  async fetchPlaylistMetadata(playlist) {
+    if (!playlist || playlist.length === 0) return;
+    const { ipcRenderer } = require('electron');
+
+    // 分批获取元数据，避免一次性请求过多
+    const batchSize = 5;
+    for (let i = 0; i < playlist.length; i += batchSize) {
+      const batch = playlist.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (song) => {
+        // 如果已经有 name（标题），跳过
+        if (song.name && song.name !== this.getFileNameFromPath(song.path)) return;
+
+        try {
+          const meta = await ipcRenderer.invoke('parse-song-metadata', song.path);
+          if (meta) {
+            if (meta.title) song.name = meta.title;
+            if (meta.artist) song.artist = meta.artist;
+            if (meta.album) song.album = meta.album;
+            if (meta.duration) song.duration = meta.duration;
+          }
+        } catch (e) {
+          console.error('获取歌曲元数据失败:', song.path, e);
+        }
+      }));
+
+      // 每批处理完后刷新播放列表显示
+      this.renderPlaylistPanel();
+    }
   }
 };
 

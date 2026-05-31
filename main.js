@@ -74,8 +74,10 @@ async function parseMetadata(filePath) {
       if (format && !format.startsWith('image/')) {
         format = 'image/' + format;
       }
-      cover = `data:${format};base64,${pic.data.toString('base64')}`;
-      console.log('解析到封面:', filePath, 'format:', format, 'size:', pic.data.length);
+      // 将 Uint8Array 转换为 Buffer 再转 base64
+      const buffer = Buffer.from(pic.data);
+      cover = `data:${format};base64,${buffer.toString('base64')}`;
+      console.log('解析到封面:', filePath, 'format:', format, 'size:', buffer.length);
     } else {
       console.log('无封面:', filePath);
     }

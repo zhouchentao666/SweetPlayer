@@ -43,6 +43,7 @@ const SettingsPage = {
       { id: 'theme', label: '主题', desc: '选择应用主题', type: 'select', value: '跟随系统', options: ['跟随系统', '浅色', '深色'] },
       { id: 'accentColor', label: '主题色', desc: '选择应用主题色', type: 'colorPicker', value: '#2196F3' },
       { id: 'animations', label: '动画效果', desc: '启用界面切换和弹出动画', type: 'toggle', value: true },
+      { id: 'immersivePlayer', label: '沉浸播放器', desc: '鼠标悬停时显示播放控件，移出后自动隐藏', type: 'toggle', value: false },
       { id: 'windowEffect', label: '窗口特效', desc: '选择窗口背景特效', type: 'select', value: '亚克力', options: ['无', '亚克力', '自定义图片'] },
       { id: 'acrylicIntensity', label: '毛玻璃强度', desc: '调整亚克力效果的模糊强度', type: 'slider', value: 50, min: 0, max: 100, showWhen: 'windowEffect', showValue: '亚克力' },
       { id: 'windowEffectImage', label: '背景图片', desc: '选择自定义窗口背景图片', type: 'imagePicker', value: '', showWhen: 'windowEffect', showValue: '自定义图片' }
@@ -89,6 +90,7 @@ const SettingsPage = {
                 ${tab.label}
               </button>
             `).join('')}
+            <div class="settings-tab-indicator"></div>
           </div>
         </div>
         <div class="settings-content" id="settingsContent">
@@ -272,14 +274,31 @@ const SettingsPage = {
     const tabs = document.querySelectorAll('.settings-tab');
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
-        this.currentTab = tab.getAttribute('data-tab');
+        const tabId = tab.getAttribute('data-tab');
+        if (tabId === this.currentTab) return;
+        this.currentTab = tabId;
         this.searchQuery = '';
-        this.refresh();
+
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        this.updateTabIndicator(tab);
+        this.refreshContent();
+
+        const searchInput = document.getElementById('settingsSearch');
+        if (searchInput) searchInput.value = '';
       });
     });
 
+    this.updateTabIndicator();
+
+    this.bindContentEvents(document);
+
+  },
+
+  bindContentEvents(root) {
     // 开关
-    const toggles = document.querySelectorAll('.settings-toggle');
+    const toggles = root.querySelectorAll('.settings-toggle');
     toggles.forEach(toggle => {
       toggle.addEventListener('click', () => {
         const id = toggle.getAttribute('data-id');
@@ -289,44 +308,37 @@ const SettingsPage = {
     });
 
     // 自定义下拉选择
-    const customSelects = document.querySelectorAll('.settings-custom-select');
+    const customSelects = root.querySelectorAll('.settings-custom-select');
     customSelects.forEach(select => {
       const trigger = select.querySelector('.settings-select-trigger');
       const dropdown = select.querySelector('.settings-select-dropdown');
       
       trigger.addEventListener('click', (e) => {
         e.stopPropagation();
-        // 关闭其他下拉框
         document.querySelectorAll('.settings-custom-select.open').forEach(s => {
           if (s !== select) s.classList.remove('open');
         });
         select.classList.toggle('open');
       });
       
-      // 选项点击
       const options = select.querySelectorAll('.settings-select-option');
       options.forEach(option => {
         option.addEventListener('click', () => {
           const value = option.getAttribute('data-value');
           const id = select.getAttribute('data-id');
           
-          // 更新显示值
           select.querySelector('.settings-select-value').textContent = value;
           
-          // 更新选中状态
           options.forEach(opt => opt.classList.remove('selected'));
           option.classList.add('selected');
           
-          // 关闭下拉框
           select.classList.remove('open');
           
-          // 更新设置
           this.updateSetting(id, value);
         });
       });
     });
     
-    // 点击外部关闭下拉框
     document.addEventListener('click', () => {
       document.querySelectorAll('.settings-custom-select.open').forEach(s => {
         s.classList.remove('open');
@@ -334,7 +346,7 @@ const SettingsPage = {
     });
 
     // 滑块
-    const sliders = document.querySelectorAll('.settings-slider');
+    const sliders = root.querySelectorAll('.settings-slider');
     sliders.forEach(slider => {
       let isDragging = false;
       
@@ -383,7 +395,6 @@ const SettingsPage = {
         isDragging = false;
       });
       
-      // 点击直接设置
       slider.addEventListener('click', (e) => {
         if (!isDragging) {
           updateSlider(e);
@@ -392,7 +403,7 @@ const SettingsPage = {
     });
 
     // 按钮
-    const buttons = document.querySelectorAll('.settings-btn');
+    const buttons = root.querySelectorAll('.settings-btn');
     buttons.forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
@@ -405,14 +416,13 @@ const SettingsPage = {
     });
 
     // 主题色选择
-    const colorOptions = document.querySelectorAll('.settings-color-option');
+    const colorOptions = root.querySelectorAll('.settings-color-option');
     colorOptions.forEach(option => {
       option.addEventListener('click', () => {
         const color = option.getAttribute('data-color');
         const picker = option.closest('.settings-color-picker');
         const id = picker.getAttribute('data-id');
         
-        // 更新选中状态
         picker.querySelectorAll('.settings-color-option').forEach(opt => {
           opt.classList.remove('active');
           opt.innerHTML = '';
@@ -420,14 +430,13 @@ const SettingsPage = {
         option.classList.add('active');
         option.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
         
-        // 应用主题色
         this.updateSetting(id, color);
         ThemeManager.setAccentColor(color);
       });
     });
 
     // 背景图片选择
-    const imagePickers = document.querySelectorAll('.settings-image-picker');
+    const imagePickers = root.querySelectorAll('.settings-image-picker');
     imagePickers.forEach(picker => {
       const id = picker.getAttribute('data-id');
       const preview = picker.querySelector('[data-action="select-image"]');
@@ -455,7 +464,6 @@ const SettingsPage = {
         });
       }
     });
-
   },
 
   refresh() {
@@ -470,16 +478,23 @@ const SettingsPage = {
     const content = document.getElementById('settingsContent');
     if (content) {
       content.innerHTML = this.renderSettingsList();
-      // 重新绑定事件
-      const toggles = content.querySelectorAll('.settings-toggle');
-      toggles.forEach(toggle => {
-        toggle.addEventListener('click', () => {
-          const id = toggle.getAttribute('data-id');
-          this.updateSetting(id, !toggle.classList.contains('active'));
-          toggle.classList.toggle('active');
-        });
-      });
+      this.bindContentEvents(content);
     }
+  },
+
+  updateTabIndicator(activeTab) {
+    const tabsContainer = document.querySelector('.settings-tabs');
+    const indicator = tabsContainer ? tabsContainer.querySelector('.settings-tab-indicator') : null;
+    if (!tabsContainer || !indicator) return;
+
+    const tab = activeTab || tabsContainer.querySelector('.settings-tab.active');
+    if (!tab) return;
+
+    const containerRect = tabsContainer.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect();
+
+    indicator.style.left = (tabRect.left - containerRect.left) + 'px';
+    indicator.style.width = tabRect.width + 'px';
   },
 
   findSetting(id) {
@@ -505,6 +520,11 @@ const SettingsPage = {
         // 动画效果开关
         if (id === 'animations') {
           this.applyAnimations(value);
+        }
+        
+        // 沉浸播放器
+        if (id === 'immersivePlayer') {
+          this.applyImmersivePlayer(value);
         }
         
         // 窗口特效改变时刷新页面以显示/隐藏相关设置
@@ -598,6 +618,11 @@ const SettingsPage = {
           this.applyAnimations(data.animations);
         }
         
+        // 应用沉浸播放器
+        if (data.immersivePlayer !== undefined) {
+          this.applyImmersivePlayer(data.immersivePlayer);
+        }
+        
         console.log('设置已从文件加载:', data);
       }
     } catch (err) {
@@ -633,6 +658,11 @@ const SettingsPage = {
         // 应用动画设置
         if (data.animations !== undefined) {
           this.applyAnimations(data.animations);
+        }
+        
+        // 应用沉浸播放器
+        if (data.immersivePlayer !== undefined) {
+          this.applyImmersivePlayer(data.immersivePlayer);
         }
         
         // 应用窗口特效
@@ -724,6 +754,34 @@ const SettingsPage = {
 
   applyAnimations(enabled) {
     document.documentElement.classList.toggle('no-animations', !enabled);
+  },
+
+  applyImmersivePlayer(enabled) {
+    const controlBar = document.querySelector('.control-bar');
+    if (!controlBar) return;
+
+    controlBar.classList.toggle('immersive', enabled);
+
+    if (enabled) {
+      if (!controlBar._immersiveBound) {
+        controlBar._immersiveMouseEnter = () => {
+          controlBar.classList.add('immersive-hover');
+        };
+        controlBar._immersiveMouseLeave = () => {
+          controlBar.classList.remove('immersive-hover');
+        };
+        controlBar.addEventListener('mouseenter', controlBar._immersiveMouseEnter);
+        controlBar.addEventListener('mouseleave', controlBar._immersiveMouseLeave);
+        controlBar._immersiveBound = true;
+      }
+    } else {
+      controlBar.classList.remove('immersive-hover');
+      if (controlBar._immersiveBound) {
+        controlBar.removeEventListener('mouseenter', controlBar._immersiveMouseEnter);
+        controlBar.removeEventListener('mouseleave', controlBar._immersiveMouseLeave);
+        controlBar._immersiveBound = false;
+      }
+    }
   }
 };
 

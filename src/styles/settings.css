@@ -90,44 +90,61 @@ body[data-theme="dark"] .settings-search input::placeholder {
 /* 分类标签 */
 .settings-tabs {
   display: flex;
-  gap: 8px;
+  gap: 24px;
   flex-wrap: wrap;
+  position: relative;
+  padding-bottom: 2px;
 }
 
 .settings-tab {
-  padding: 6px 16px;
+  padding: 8px 4px;
   border: none;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.05);
+  border-radius: 0;
+  background: transparent;
   color: #666666;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
+  position: relative;
+  white-space: nowrap;
 }
 
 body[data-theme="dark"] .settings-tab {
-  background: rgba(255, 255, 255, 0.08);
-  color: #dddddd;
+  background: transparent;
+  color: #aaaaaa;
 }
 
 .settings-tab:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: transparent;
+  color: #333333;
 }
 
 body[data-theme="dark"] .settings-tab:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #ffffff;
 }
 
 .settings-tab.active {
-  background: var(--accent-color, #2196F3);
-  color: #ffffff;
+  background: transparent;
+  color: var(--accent-color, #2196F3);
   font-weight: 500;
 }
 
 body[data-theme="dark"] .settings-tab.active {
+  background: transparent;
+  color: var(--accent-color, #2196F3);
+}
+
+/* 底部滑动指示条 */
+.settings-tab-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
   background: var(--accent-color, #2196F3);
-  color: #ffffff;
+  border-radius: 2px 2px 0 0;
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 设置内容区 */
@@ -614,7 +631,10 @@ body[data-theme="light"] .settings-empty {
   color: #555555;
 }
 
-body[data-theme="light"] .settings-tab.active,
+body[data-theme="light"] .settings-tab.active {
+  color: var(--accent-color, #2196F3);
+}
+
 body[data-theme="light"] .settings-select-option.selected,
 body[data-theme="light"] .settings-btn-primary {
   color: #ffffff;
