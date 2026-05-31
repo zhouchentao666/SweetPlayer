@@ -1,0 +1,71 @@
+.sponsor-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 32px;
+}
+
+.sponsor-header {
+  margin-bottom: 32px;
+}
+
+.sponsor-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+body[data-theme="dark"] .sponsor-title {
+  color: #ffffff;
+}
+
+.sponsor-desc {
+  font-size: 14px;
+  color: #666666;
+}
+
+body[data-theme="dark"] .sponsor-desc {
+  color: #aaaaaa;
+}
+
+.sponsor-content {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  align-items: flex-start;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sponsor-item {
+  text-align: center;
+}
+
+.sponsor-item h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 16px;
+}
+
+body[data-theme="dark"] .sponsor-item h3 {
+  color: #ffffff;
+}
+
+.sponsor-qr {
+  width: 280px;
+  height: 280px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.sponsor-qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
